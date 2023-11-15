@@ -10,6 +10,7 @@ Resources
 - ArduinoBLE peripheral LED.ino 
 - ArduinoBLE central LEDControl.ino
 - https://howtomechatronics.com/tutorials/arduino/ultrasonic-sensor-hc-sr04/
+- https://www.youtube.com/watch?v=u_cJCtaEmyA&ab_channel=BinaBhatt (how to use breadboard power supply module)
 */
 
 // bluetooth peripheral
@@ -76,7 +77,7 @@ void loop() {
       duration = pulseIn(ECHO, HIGH);
       distance = duration * 0.034 / 2; // speed of sound = 340 m/s
 
-      // set characteristic = true if motion detected
+      // TODO: set characteristic = true if motion detected
       Serial.print("Distance: ");
       Serial.println(distance);
     }
