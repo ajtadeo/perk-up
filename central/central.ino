@@ -2,6 +2,7 @@
 #include <RTCZero.h>
 
 int times = 0; // keep track of the number of times the coffee maker has been turned on in a given time period
+const int d8 = 8;
 
 //Dummy Services and Initialization
 BLEService sensorService("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
@@ -24,6 +25,10 @@ void setup() {
   // start scanning for peripheral
   BLE.scan();
 
+  // set up pin d8 for GPIO output, this is the pin that will activate our solenoid
+  pinMode(d8, OUTPUT);
+
+
 }
 
 void loop() {
@@ -34,6 +39,10 @@ void loop() {
   if ( (peripheral.address() == "abc") && (clock) && (!times)){ 
     times++; // do not turn on again
     // turn the coffee maker on
+    digitalWrite(d8,0); // solenoid activation
+    delay(2000);
+    digitalWrite(d8,1);
+    delay(2000);
   }
   else {
     times=0;
