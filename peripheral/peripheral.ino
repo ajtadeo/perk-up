@@ -1,6 +1,7 @@
 #include <ArduinoBLE.h>
 #include <RTCZero.h>
 
+int times = 0;
 RTCZero rtc;
 
 //rtc values
@@ -89,7 +90,8 @@ void setup() {
 
 void loop() {
   int clock = rtc.getHours();
-  if ((clock >=7 ) && (clock <=11)) {
+  if ((clock >=7 ) && (clock <=11) && (times==0)) {
+    times++;
     // listen for Bluetooth® Low Energy peripherals to connect:
     BLEDevice central = BLE.central();
 
@@ -117,6 +119,11 @@ void loop() {
       Serial.print("Disconnected from central: ");
       Serial.println(central.address());
 
+    }
+  }
+  else {
+    if ((times == 1) && (clock <7) && (clock > 11)) {
+       times = 0;
     }
   }
 }

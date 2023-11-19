@@ -1,7 +1,5 @@
 #include <ArduinoBLE.h>
-#include <RTCZero.h>
 
-int times = 0; // keep track of the number of times the coffee maker has been turned on in a given time period
 const int d8 = 8;
 
 //Dummy Services and Initialization
@@ -36,8 +34,7 @@ void loop() {
   BLEDevice peripheral = BLE.available();
 
   //identity check for security reasons + clock & times check to activate coffee maker
-  if ( (peripheral.address() == "abc") && (clock) && (!times)){ 
-    times++; // do not turn on again
+  if ( peripheral.address() == "abc"){ 
     // turn the coffee maker on
     digitalWrite(d8,0); // solenoid activation
     delay(2000);
@@ -45,7 +42,7 @@ void loop() {
     delay(2000);
   }
   else {
-    times=0;
+    // do something?
   }
 
 
