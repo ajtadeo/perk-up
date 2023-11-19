@@ -1,4 +1,18 @@
 #include <ArduinoBLE.h>
+#include <RTCZero.h>
+
+RTCZero rtc;
+
+//rtc values
+/* Change these values to set the current initial time */
+const byte seconds = 0;
+const byte minutes = 0;
+const byte hours = 16;
+
+/* Change these values to set the current initial date */
+const byte day = 15;
+const byte month = 6;
+const byte year = 15;
 
 /*
 Perk Up! Peripheral Bluetooth Arduino
@@ -16,6 +30,9 @@ Resources
 // bluetooth peripheral
 BLEService sensorService("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
 BLEBoolCharacteristic movementCharacteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71B", BLERead);
+
+//Arman stuff
+
 
 // pin assignments
 const int LED = LED_BUILTIN;
@@ -55,35 +72,51 @@ void setup() {
   // advertise to central connections
   BLE.advertise();
   Serial.println("Advertising 'Perk Up Peripheral 1'...");
+
+  //rtc interface
+
+  rtc.begin(); // initialize RTC
+
+  rtc.setHours(hours);
+  rtc.setMinutes(minutes);
+  rtc.setSeconds(seconds);
+
+  // Set the date
+  rtc.setDay(day);
+  rtc.setMonth(month);
+  rtc.setYear(year);
 }
 
 void loop() {
-  // listen for Bluetooth® Low Energy peripherals to connect:
-  BLEDevice central = BLE.central();
+  int clock = rtc.getHours();
+  if ((clock >=7 ) && (clock <=11)) {
+    // listen for Bluetooth® Low Energy peripherals to connect:
+    BLEDevice central = BLE.central();
 
-  if (central) {
-    Serial.print("Connected to central: ");
-    Serial.println(central.address());
-    
-    while(central.connected()) {
-      // clear TRIG pin
-      digitalWrite(TRIG, LOW);
-      delayMicroseconds(2);
+    if (central) {
+      Serial.print("Connected to central: ");
+      Serial.println(central.address());
+      
+      while(central.connected()) {
+        // clear TRIG pin
+        digitalWrite(TRIG, LOW);
+        delayMicroseconds(2);
 
-      // calculate distance data in cm
-      digitalWrite(TRIG, HIGH);
-      delayMicroseconds(10);
-      digitalWrite(TRIG, LOW);
-      duration = pulseIn(ECHO, HIGH);
-      distance = duration * 0.034 / 2; // speed of sound = 340 m/s
+        // calculate distance data in cm
+        digitalWrite(TRIG, HIGH);
+        delayMicroseconds(10);
+        digitalWrite(TRIG, LOW);
+        duration = pulseIn(ECHO, HIGH);
+        distance = duration * 0.034 / 2; // speed of sound = 340 m/s
 
-      // TODO: set characteristic = true if motion detected
-      Serial.print("Distance: ");
-      Serial.println(distance);
+        // TODO: set characteristic = true if motion detected
+        Serial.print("Distance: ");
+        Serial.println(distance);
+      }
+
+      Serial.print("Disconnected from central: ");
+      Serial.println(central.address());
+
     }
-
-    Serial.print("Disconnected from central: ");
-    Serial.println(central.address());
-
   }
 }
