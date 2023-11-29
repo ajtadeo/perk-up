@@ -44,6 +44,10 @@ const int TRIG = 3; // digital pin D3
 long duration;
 int distance; 
 
+// set up moving average buffer
+const int BUFFER_SIZE = 5;
+int moving_buffer[BUFFER_SIZE] = {100};
+
 void setup() {
   Serial.begin(9600);
   while (!Serial);
@@ -110,6 +114,8 @@ void loop() {
         digitalWrite(TRIG, LOW);
         duration = pulseIn(ECHO, HIGH);
         distance = duration * 0.034 / 2; // speed of sound = 340 m/s
+        shift_buffer_left(distance); // add new distance value to our moving average filter
+        int moving_average = get_buffer_average();
 
         // TODO: set characteristic = true if motion detected
         Serial.print("Distance: ");
@@ -126,4 +132,21 @@ void loop() {
        times = 0;
     }
   }
+}
+
+void shift_buffer_left(int new_value) {
+  // shift 0->3, 1-4
+  for (int i = 0 ; i < BUFFER_SIZE-1; ++i) {
+    moving_buffer[i+1] = moving_buffer[i];
+  }
+
+  moving_buffer[0] = new_value;
+}
+
+float get_buffer_average() {
+  float sum = 0;
+  for (int i = 0; i < BUFFER_SIZE; ++i) {
+    sum += moving_buffer[i];
+  }
+  return sum / (float)(BUFFER_SIZE);
 }
