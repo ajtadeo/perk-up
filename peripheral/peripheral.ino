@@ -46,7 +46,7 @@ int distance;
 
 // set up moving average buffer
 const int BUFFER_SIZE = 5;
-int moving_buffer[BUFFER_SIZE] = {100};
+int moving_buffer[BUFFER_SIZE] = {100,100,100,100,100};
 
 void setup() {
   Serial.begin(9600);
