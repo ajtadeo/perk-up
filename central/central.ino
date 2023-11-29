@@ -21,7 +21,7 @@ void setup() {
   Serial.println("Bluetooth® Low Energy Central scan");
 
   // start scanning for peripheral
-  BLE.scan();
+  BLE.scanForUuid("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
 
   // set up pin d8 for GPIO output, this is the pin that will activate our solenoid
   pinMode(d8, OUTPUT);
@@ -32,19 +32,16 @@ void setup() {
 void loop() {
   // check if a peripheral has been discovered
   BLEDevice peripheral = BLE.available();
-
-  //identity check for security reasons + clock & times check to activate coffee maker
-  if ( peripheral.address() == "abc"){ 
-    // turn the coffee maker on
-    digitalWrite(d8,0); // solenoid activation
-    delay(2000);
-    digitalWrite(d8,1);
+  if (peripheral) {
+    Serial.println("Connection Established");
+    BLE.stopScan();
+    peripheral.connect();
+    Serial.println("Stopping scan temporarily");
+    BLE.scanForUuid("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
+    // digitalWrite(d8,0); // solenoid activation
+    // delay(2000);
+    // digitalWrite(d8,1);
     delay(2000);
   }
-  else {
-    // do something?
-  }
-
-
 
 }
