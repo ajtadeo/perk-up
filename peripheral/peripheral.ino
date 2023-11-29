@@ -8,7 +8,7 @@ RTCZero rtc;
 /* Change these values to set the current initial time */
 const byte seconds = 0;
 const byte minutes = 0;
-const byte hours = 16;
+const byte hours = 8;
 
 /* Change these values to set the current initial date */
 const byte day = 15;
