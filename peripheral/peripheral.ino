@@ -120,6 +120,9 @@ void loop() {
         // TODO: set characteristic = true if motion detected
         Serial.print("Distance: ");
         Serial.println(distance);
+
+        Serial.print("Moving Avg: ");
+        Serial.println(moving_average);
       }
 
       Serial.print("Disconnected from central: ");
