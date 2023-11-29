@@ -111,18 +111,18 @@ void loop() {
         duration = pulseIn(ECHO, HIGH);
         distance = duration * 0.034 / 2; // speed of sound = 340 m/s
 
+        // TODO: only send messages one time (via times) during set time period
         if (distance < THRESHOLD){
           int clock = rtc.getHours();
-          if (times == 0){
           // if ((clock >=7 ) && (clock <=11) && (times==0)) {
             Serial.println("SENDING MESSAGE TO CENTRAL!!!!");
-            times++;
+            // times++;
             movementCharacteristic.writeValue(true);
-            delay(2000);
-          }
+          // }
         } else {
           Serial.print("Distance: ");
           Serial.println(distance);
+          movementCharacteristic.writeValue(false);
         }
       }
 
