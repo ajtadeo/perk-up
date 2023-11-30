@@ -32,9 +32,6 @@ Resources
 BLEService sensorService("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
 BLEBoolCharacteristic movementCharacteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71B", BLERead);
 
-//Arman stuff
-
-
 // pin assignments
 const int LED = LED_BUILTIN;
 const int ECHO = 2; // digital pin D2
@@ -43,6 +40,7 @@ const int TRIG = 3; // digital pin D3
 // ultrasonic sensor
 long duration;
 int distance; 
+const int THRESHOLD = 10; // 100cm
 
 // set up moving average buffer
 const int BUFFER_SIZE = 5;
@@ -76,7 +74,9 @@ void setup() {
 
   // advertise to central connections
   BLE.advertise();
-  Serial.println("Advertising 'Perk Up Peripheral 1'...");
+  Serial.print("Advertising 'Perk Up Peripheral 1' with UUID: ");
+  Serial.print(sensorService.uuid());
+  Serial.println("...");
 
   //rtc interface
 
@@ -93,9 +93,9 @@ void setup() {
 }
 
 void loop() {
-  int clock = rtc.getHours();
-  if ((clock >=7 ) && (clock <=11) && (times==0)) {
-    times++;
+  // int clock = rtc.getHours();
+  // if ((clock >=7 ) && (clock <=11) && (times==0)) {
+  //   times++;
     // listen for Bluetooth® Low Energy peripherals to connect:
     BLEDevice central = BLE.central();
 
@@ -114,12 +114,24 @@ void loop() {
         digitalWrite(TRIG, LOW);
         duration = pulseIn(ECHO, HIGH);
         distance = duration * 0.034 / 2; // speed of sound = 340 m/s
+
+        // remove sensor noise with shift buffer
         shift_buffer_left(distance); // add new distance value to our moving average filter
         int moving_average = get_buffer_average();
 
-        // TODO: set characteristic = true if motion detected
-        Serial.print("Distance: ");
-        Serial.println(distance);
+        // TODO: only send messages one time (via times) during set time period
+        if (distance < THRESHOLD){
+          int clock = rtc.getHours();
+          // if ((clock >=7 ) && (clock <=11) && (times==0)) {
+            Serial.println("SENDING MESSAGE TO CENTRAL!!!!");
+            // times++;
+            movementCharacteristic.writeValue(true);
+          // }
+        } else {
+          Serial.print("Distance: ");
+          Serial.println(distance);
+          movementCharacteristic.writeValue(false);
+        }
 
         Serial.print("Moving Avg: ");
         Serial.println(moving_average);
@@ -127,15 +139,15 @@ void loop() {
 
       Serial.print("Disconnected from central: ");
       Serial.println(central.address());
-
+      times = 0;
     }
   }
-  else {
-    if ((times == 1) && (clock <7) && (clock > 11)) {
-       times = 0;
-    }
-  }
-}
+  // }
+  // else {
+  //   if ((times == 1) && (clock <7) && (clock > 11)) {
+  //      times = 0;
+  //   }
+  // }
 
 void shift_buffer_left(int new_value) {
   // shift 0->3, 1-4
