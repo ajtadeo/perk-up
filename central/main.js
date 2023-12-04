@@ -2,21 +2,27 @@ const express = require("express");
 const { createServer } = require("http");
 const { Liquid } = require('liquidjs');
 const bodyParser = require("body-parser");
-var bleno = require("bleno");
+var bleno = require("@abandonware/bleno");
 
-GUI_SERVICE_UUID = "3F8B0000-7E9A-442B-AFBC-6C5FEF789C2D";
+const GUI_SERVICE_UUID = "3F8B0000-7E9A-442B-AFBC-6C5FEF789C2D";
+const CHARACTERISTIC_UUID = "3F8B0000-7E9A-442B-AFBC-6C5FEF789C2D";
 const PORT = 8888;
 const HOSTNAME = "localhost";
+var start;
+var end;
 
-var BlenoPrimaryService = bleno.PrimaryService;
-var DatetimeCharacteristic = require("./characteristic");
-const service = new BlenoPrimaryService({
-  uuid: GUI_SERVICE_UUID,
-  characteristics: [
-    new DatetimeCharacteristic()
-  ]
-})
-const characteristic = new DatetimeCharacteristic();
+// var BlenoPrimaryService = bleno.PrimaryService;
+// const service = new BlenoPrimaryService({
+//   uuid: GUI_SERVICE_UUID,
+//   characteristics: [
+//     new DatetimeCharacteristic()
+//   ]
+// })
+
+// var DatetimeCharacteristic = bleno.Characteristic;
+// const characteristic = new DatetimeCharacteristic(
+
+// );
 
 // WEB SERVER
 const app = express();
@@ -34,13 +40,12 @@ app.get("/", (req, res) => {
 });
 
 app.post("/update_schedule", (req, res) => {
-  const startHour = req.body.startHour;
-  const endHour = req.body.endHour;
-  const msg = startHour + '-' + endHour;
-
+  start = parseInt(req.body.startHour);
+  end = parseInt(req.body.endHour);
+  res.redirect("/");
   // TODO: send message via bluetooth
   // if (characteristic) {
-  //   characteristic.
+  //   write
   //   characteristic.updateValue(Buffer.from(msg));
   //   console.log("Bluetooth message sent:", msg);
   //   res.redirect("/");
@@ -63,7 +68,7 @@ bleno.on("stateChange", function (state) {
   console.log('on -> stateChange: ' + state);
 
   if (state === 'poweredOn') {
-    bleno.startAdvertising('GUI Peripheral', [GUI_SERVICE_UUID]);
+    bleno.startAdvertising('GUI', [GUI_SERVICE_UUID]);
   } else {
     bleno.stopAdvertising();
   }
@@ -72,7 +77,30 @@ bleno.on("stateChange", function (state) {
 bleno.on('advertisingStart', function (error) {
   console.log('on -> advertisingStart: ' + (error ? 'error ' + error : 'success'));
 
-  if (!error) {
-    bleno.setServices([service]);
+  if (error) {
+    console.log(error)
+  } else {
+    bleno.setServices([
+      new bleno.PrimaryService(
+        {
+          uuid: GUI_SERVICE_UUID,
+          
+          characteristics: [
+            new bleno.Characteristic({
+              uuid: CHARACTERISTIC_UUID,
+              value: null,
+              properties: ['read'],
+              onReadRequest: function (offset, callback) {
+                console.log("READ request received");
+                // read the temperature value from the sensor
+                // this.value = start;
+                this.value = 0;
+                console.log('Start value: ' + this.value);
+                callback(this.RESULT_SUCCESS, Buffer.alloc((this.value ? this.value.toString() : "")));
+              }
+            })
+          ]
+        })
+    ])
   }
 });
