@@ -5,18 +5,19 @@ var bleno = require('bleno');
 const CHARACTERISTIC_UUID = "3F8B0000-7E9A-442B-AFBC-6C5FEF789C2D";
 
 class DatetimeCharacteristic extends bleno.Characteristic {
-  constructor () {
+  constructor() {
     super({
       uuid: CHARACTERISTIC_UUID,
-      properties: ['read'],
+      properties: ['write'],
       value: null,
     })
     this._value = Buffer.alloc(0);
     this._updateValueCallback = null;
   }
 
-  onReadRequest(offset, callback) {
-    console.log('DatetimeCharacteristic - onReadRequest: value = ' + this._value.toString('hex'));
+  onWriteRequest(data, offset, withoutResponse, callback) {
+    this._value = data;
+    console.log('DatetimeCharacteristic - onWriteRequest: value = ' + this._value.toString('hex'));
     callback(this.RESULT_SUCCESS, this._value);
   }
 }
