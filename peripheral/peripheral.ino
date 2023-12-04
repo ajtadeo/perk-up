@@ -15,9 +15,12 @@ Resources
 #include <RTCZero.h>
 
 // bluetooth peripheral
-BLEService sensorService("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
-BLEBoolCharacteristic movementCharacteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71B", BLERead);
-BLEBoolCharacteristic soundCharacteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71A", BLERead | BLEWrite );
+const char SERVICE_UUID[] = "86A90000-3D47-29CA-7B15-ED5A42F8E71B";
+const char MOVEMENT_UUID[] = "86A90000-3D47-29CA-7B15-ED5A42F8E71B";
+const char SOUND_UUID[] = "86A90000-3D47-29CA-7B15-ED5A42F8E71A";
+BLEService sensorService(SERVICE_UUID);
+BLEBoolCharacteristic movementCharacteristic(MOVEMENT_UUID, BLERead);
+BLEBoolCharacteristic soundCharacteristic(SOUND_UUID, BLERead | BLEWrite );
 
 // pin assignments
 const int LED = LED_BUILTIN;
