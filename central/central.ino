@@ -1,10 +1,11 @@
 #include <ArduinoBLE.h>
 
-const int d8 = 8;
+const int solenoid_switch = 8; // solenoid switch
+const int sound_threshhold = 9; // GPIO-IN : is our sound above the threshhold?
 
 //Dummy Services and Initialization
 BLEService sensorService("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
-
+BLECharacteristic sound_characteristic = peripheral.characteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71A");
 
 void setup() {
   Serial.begin(9600);
@@ -38,10 +39,33 @@ void loop() {
     controlLed(peripheral);
 
     BLE.scanForUuid("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
+    
+    actuate:
     // digitalWrite(d8,0); // solenoid activation
     // delay(2000);
     // digitalWrite(d8,1);
-    delay(2000);
+    delay(5000);
+
+    // read sound data, we want the is_sound_on to be high for atleast THRESHOLD cycles to count it
+    int is_sound_on = digitalRead(sound_threshhold);
+    int on_count = 0;
+    int off _count = 0;
+    const int THRESHOLD = 5;
+    while (1) {
+      if (is_sound_on) {
+        on_count++;
+      } else {
+        on_count = 0;
+        off_count++;
+      }
+
+      if (count >= 5) {
+        break;
+        // send signal back that the thing has been pressed
+        sound_characteristic.writeValue("86A90000-3D47-29CA-7B15-ED5A42F8E71B")
+      }
+      delay(10);
+    }
   }
 
 }
