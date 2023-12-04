@@ -5,7 +5,7 @@ const int sound_threshhold = 9; // GPIO-IN : is our sound above the threshhold?
 
 //Dummy Services and Initialization
 BLEService sensorService("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
-
+BLECharacteristic sound_characteristic = peripheral.characteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71A");
 
 void setup() {
   Serial.begin(9600);
@@ -61,10 +61,8 @@ void loop() {
 
       if (count >= 5) {
         break;
-      }
-
-      if (off_count >= 10000) {
-        goto actuate;
+        // send signal back that the thing has been pressed
+        sound_characteristic.writeValue("86A90000-3D47-29CA-7B15-ED5A42F8E71B")
       }
       delay(10);
     }
