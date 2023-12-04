@@ -1,11 +1,14 @@
 #include <ArduinoBLE.h>
 
-const int solenoid_switch = 8; // solenoid switch
-const int sound_threshhold = 9; // GPIO-IN : is our sound above the threshhold?
+// pin assignment
+const int solenoid_switch_pin = 8; // solenoid switch
+const int sound_threshhold_pin = 9; // GPIO-IN : is our sound above the threshhold?
 
-//Dummy Services and Initialization
-BLEService sensorService("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
-BLECharacteristic sound_characteristic = peripheral.characteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71A");
+// ble
+const char SERVICE_UUID[] = "86A90000-3D47-29CA-7B15-ED5A42F8E71B";
+const char MOVEMENT_UUID[] = "86A90000-3D47-29CA-7B15-ED5A42F8E71B";
+const char SOUND_UUID[] = "86A90000-3D47-29CA-7B15-ED5A42F8E71A";
+BLEService sensorService(SERVICE_UUID);
 
 void setup() {
   Serial.begin(9600);
@@ -18,15 +21,12 @@ void setup() {
     while (1);
   }
   
-  Serial.println("Bluetooth® Low Energy Central scan");
+  // set up pin solenoid_switch_pin for GPIO output, this is the pin that will activate our solenoid
+  pinMode(solenoid_switch_pin, OUTPUT);
 
   // start scanning for peripheral
-  BLE.scanForUuid("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
-
-  // set up pin d8 for GPIO output, this is the pin that will activate our solenoid
-  pinMode(d8, OUTPUT);
-
-
+  Serial.println("Bluetooth® Low Energy Central scan");
+  BLE.scanForUuid(SERVICE_UUID);
 }
 
 void loop() {
@@ -35,42 +35,14 @@ void loop() {
   if (peripheral) {
     Serial.println("Connection Established");
     BLE.stopScan();
-    Serial.println("Stopping scan temporarily");
-    controlLed(peripheral);
-
-    BLE.scanForUuid("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
     
-    actuate:
-    // digitalWrite(d8,0); // solenoid activation
-    // delay(2000);
-    // digitalWrite(d8,1);
-    delay(5000);
+    controlPeripheral(peripheral); // loop here with peripheral logic
 
-    // read sound data, we want the is_sound_on to be high for atleast THRESHOLD cycles to count it
-    int is_sound_on = digitalRead(sound_threshhold);
-    int on_count = 0;
-    int off _count = 0;
-    const int THRESHOLD = 5;
-    while (1) {
-      if (is_sound_on) {
-        on_count++;
-      } else {
-        on_count = 0;
-        off_count++;
-      }
-
-      if (count >= 5) {
-        break;
-        // send signal back that the thing has been pressed
-        sound_characteristic.writeValue("86A90000-3D47-29CA-7B15-ED5A42F8E71B")
-      }
-      delay(10);
-    }
+    BLE.scanForUuid(SERVICE_UUID);
   }
-
 }
 
-void controlLed(BLEDevice peripheral) {
+void controlPeripheral(BLEDevice peripheral) {
   // connect to the peripheral
   Serial.println("Connecting ...");
 
@@ -91,44 +63,61 @@ void controlLed(BLEDevice peripheral) {
     return;
   }
 
-  // retrieve the LED characteristic
-  BLECharacteristic movementCharacteristic = peripheral.characteristic("86A90000-3D47-29CA-7B15-ED5A42F8E71B");
+  // retrieve the characteristics
+  BLECharacteristic movementCharacteristic = peripheral.characteristic(MOVEMENT_UUID);
+  BLECharacteristic sound_characteristic = peripheral.characteristic(SOUND_UUID);
 
   if (!movementCharacteristic) {
     Serial.println("Peripheral does not have movement characteristic!");
     peripheral.disconnect();
     return;
-  } else if (!movementCharacteristic.canRead()) {
-    Serial.println("Peripheral does not have a readable movement characteristic!");
+  } else if (!sound_characteristic) {
+    Serial.println("Peripheral does not have sound characteristic!");
     peripheral.disconnect();
     return;
   }
 
   while (peripheral.connected()) {
-    byte value = 0;
-    movementCharacteristic.readValue(value);
-    Serial.println(value);
-    // // while the peripheral is connected
+    // await movement sensed from peripheral
+    byte movementSensed = false;
+    movementCharacteristic.readValue(movementSensed);
+    if (movementSensed) {
+      // actuate solenoid
+      digitalWrite(solenoid_switch_pin,1); // solenoid activation
+      delay(2000);
+      digitalWrite(solenoid_switch_pin,0);
+      delay(100);
 
-    // // read the button pin
-    // int buttonState = digitalRead(buttonPin);
+      // await sound from coffee machine
+      int is_sound_on = digitalRead(sound_threshhold_pin);
+      int on_count = 0;
+      int off_count = 0;
+      const int THRESHOLD = 2;
+      while (1) {
+        is_sound_on = digitalRead(sound_threshhold_pin);
+        Serial.println(is_sound_on);
+        if (is_sound_on) {
+          on_count++;
+        } else if (off_count >= 10000) { // large threshold, TODO: figure out what this should be
+          break;
+        } 
+        else {
+          on_count = 0;
+          off_count++;
+        }
 
-    // if (oldButtonState != buttonState) {
-    //   // button changed
-    //   oldButtonState = buttonState;
+        if (on_count >= THRESHOLD) {
+          // send signal back that the thing has been pressed
+          sound_characteristic.writeValue((byte)1);
+          Serial.println("sending press characteristic");
+          break;
+        }
+        delay(10);
+      }
+    }  
+    
+    sound_characteristic.writeValue((byte)0);
 
-    //   if (buttonState) {
-    //     Serial.println("button pressed");
-
-    //     // button is pressed, write 0x01 to turn the LED on
-    //     ledCharacteristic.writeValue((byte)0x01);
-    //   } else {
-    //     Serial.println("button released");
-
-    //     // button is released, write 0x00 to turn the LED off
-    //     ledCharacteristic.writeValue((byte)0x00);
-    //   }
-    // }
   }
 
   Serial.println("Peripheral disconnected");
