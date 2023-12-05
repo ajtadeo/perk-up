@@ -26,6 +26,25 @@ BLEBoolCharacteristic soundCharacteristic(SOUND_UUID, BLERead | BLEWrite );
 const int LED = LED_BUILTIN;
 const int ECHO = 2; // digital pin D2
 const int TRIG = 3; // digital pin D3
+const int A = 11;
+const int B = 10;
+const int C = 9;
+const int D = 8;
+const int E = 7;
+const int F = 6;
+const int G = 5;
+const int D1 = 12;
+const int D2 = 20;
+const int D3 = 19;
+const int D4 = 21;
+
+const int START_BTN = 14;
+const int END_BTN = 15;
+
+int count = 0;
+bool already_reading_1, already_reading_2 = 0;
+byte startHours;
+byte endHours;
 
 // ultrasonic sensor
 long duration;
@@ -36,7 +55,8 @@ const int THRESHOLD = 20; // cm
 int state;
 const int SENSE_MOVEMENT = 0;
 const int AWAIT_ACK = 1;
-const int IDLE = 2;
+const int IDLE_COFFEE_DONE = 2;
+const int IDLE = 3;
 
 // moving buffer
 const int BUFFER_SIZE = 10;
@@ -46,13 +66,12 @@ int moving_buffer[BUFFER_SIZE] = {100,100,100,100,100};
 RTCZero rtc;
 const byte seconds = 0;
 const byte minutes = 0;
-const byte hours = 15;
+const byte hours = 1;
 const byte day = 3;
 const byte month = 12;
 const byte year = 23;
-const byte schedStartHour = 15;
-const byte schedEndHour = 16;
 const int ACK_TIMEOUT = 10; // seconds
+byte currentDay;
 
 void setup() {
   Serial.begin(9600);
@@ -62,6 +81,28 @@ void setup() {
   pinMode(LED, OUTPUT);
   pinMode(ECHO, INPUT);
   pinMode(TRIG, OUTPUT);
+  // pinMode(BRIGHTNESS, OUTPUT);
+  pinMode(START_BTN, INPUT);
+  pinMode(END_BTN, INPUT);
+  pinMode(A, OUTPUT);
+  pinMode(B, OUTPUT);
+  pinMode(C, OUTPUT);
+  pinMode(D, OUTPUT);
+  pinMode(E, OUTPUT);
+  pinMode(F, OUTPUT);
+  pinMode(G, OUTPUT);
+  pinMode(D1, OUTPUT);
+  pinMode(D2, OUTPUT);
+  pinMode(D3, OUTPUT);
+  pinMode(D4, OUTPUT);
+
+  // initialize time
+  rtc.begin();
+  rtc.setTime(hours, minutes, seconds);
+  rtc.setDate(day, month, year);
+  currentDay = day;
+  startHours = 0;
+  endHours = 0;
 
   // BLE initialization
   if (!BLE.begin()) {
@@ -88,24 +129,54 @@ void setup() {
   Serial.print(sensorService.uuid());
   Serial.println("...");
 
-  // initialize time
-  rtc.begin();
-  rtc.setTime(hours, minutes, seconds);
-  rtc.setDate(day, month, year);
-
   // initialize state
   state = IDLE;
   Serial.println("IDLE");
+  for(int i = 0; i < 4; i++) {
+    sevenSeg(i, -1);
+  }
 }
 
 void loop() {
+  // get button input
+  if (!already_reading_1 && digitalRead(START_BTN) == HIGH) {
+    already_reading_1 = 1;
+    if (startHours == 24) {
+      startHours = 0;
+    } else {
+      startHours = startHours + 1;
+    }
+  } else if (digitalRead(START_BTN) == LOW){
+    already_reading_1 = 0;
+  }
+  if (!already_reading_2 && digitalRead(END_BTN) == HIGH) {
+    already_reading_2 = 1;
+    if (endHours == 24) {
+      endHours = 0;
+    } else {
+      endHours = endHours + 1;
+    }
+  } else if (digitalRead(END_BTN) == LOW){
+    already_reading_2 = 0;
+  }
+
+  count++; // used for 7 segement display
+
+  setSevenSeg();
+
+  // Serial.print(startHours);
+  // Serial.print("\t");
+  // Serial.println(endHours);
+
   // listen for Bluetooth® Low Energy peripherals to connect:
   BLEDevice central = BLE.central();
 
   if (central) {
     Serial.print("Connected to central: ");
     Serial.println(central.address());
-    
+    Serial.println("Schedule: " + String(startHours) + " - " + String(endHours));
+    offSevenSeg();
+
     while(central.connected()) {
       if (state == SENSE_MOVEMENT) {
         // clear TRIG pin
@@ -118,7 +189,7 @@ void loop() {
         digitalWrite(TRIG, LOW);
         duration = pulseIn(ECHO, HIGH);
         distance = duration * 0.034 / 2; // speed of sound = 340 m/s
-        shift_buffer_left(distance); // add new distance value to our moving average filter
+        shift_buffer_left(distance); // add new distance value to our buffer
 
         // distance == 0 when ultrasonic sensor is not turned on
         if (check_buffer() && distance != 0 && distance <= THRESHOLD){
@@ -136,16 +207,25 @@ void loop() {
         byte ack;
         soundCharacteristic.readValue(ack);
         if (ack == true) {
-          state = IDLE;
-          Serial.println("AWAIT_ACK -> IDLE");
+          state = IDLE_COFFEE_DONE;
+          Serial.println("AWAIT_ACK -> IDLE_COFFEE_DONE");
         } else {
           state = AWAIT_ACK;
         }
+      } else if (state == IDLE_COFFEE_DONE) {
+        // coffee dispensed for the day, wait for next day
+        if (currentDay != rtc.getDay()) {
+          currentDay = rtc.getDay();
+          state = IDLE;
+          Serial.println("IDLE_COFFEE_DONE -> IDLE");
+        } else {
+          state = IDLE_COFFEE_DONE;
+        }
       } else if (state == IDLE) {
-        // do nothing, wait until next time period
+        // wait until current time is within schedule
         byte currentHour = rtc.getHours();
         byte currentSecond = rtc.getSeconds();
-        if (currentHour >= schedStartHour && currentHour < schedEndHour) {
+        if (currentHour >= startHours && currentHour < endHours) {
           state = SENSE_MOVEMENT;
           Serial.println("IDLE -> SENSE_MOVEMENT");
         } else {
@@ -178,4 +258,163 @@ bool check_buffer() {
     }
   }
   return true;
+}
+
+void setSevenSeg() {
+  if (count % 4 == 0) {
+    sevenSeg(1, (startHours/10));
+  } else if (count % 4 == 1) {
+    sevenSeg(2,startHours % 10);
+  } else if (count % 4 == 2) {
+    sevenSeg(3,endHours/10);
+  } else {
+    sevenSeg(4, endHours % 10);
+  }
+}
+
+void offSevenSeg() {
+  sevenSeg(1, -1);
+  sevenSeg(2, -1);
+  sevenSeg(3, -1);
+  sevenSeg(4, -1);
+}
+
+void sevenSeg(int number, int digit) {
+  // Serial.print(number);
+  // Serial.print("\t");
+  // Serial.println(digit);
+  // select digit
+  switch (number) {
+    case 1:
+      // Serial.println("1");
+      digitalWrite(D1, LOW);
+      digitalWrite(D2, HIGH);
+      digitalWrite(D3, HIGH);
+      digitalWrite(D4, HIGH);
+      break;
+    case 2:
+    // Serial.println("2");
+      digitalWrite(D1, HIGH);
+      digitalWrite(D2, LOW);
+      digitalWrite(D3, HIGH);
+      digitalWrite(D4, HIGH);    
+      break;
+    case 3:
+    // Serial.println("3");
+      digitalWrite(D1, HIGH);
+      digitalWrite(D2, HIGH);
+      digitalWrite(D3, LOW);
+      digitalWrite(D4, HIGH);
+      break;
+    case 4:
+    // Serial.println("4");
+      digitalWrite(D1, HIGH);
+      digitalWrite(D2, HIGH);
+      digitalWrite(D3, HIGH);
+      digitalWrite(D4, LOW);
+      break;
+  }
+  // select number
+  switch(digit) {
+    case 0:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, HIGH);   
+      digitalWrite(E, HIGH);   
+      digitalWrite(F, LOW);   
+      digitalWrite(G, HIGH);  
+      break;
+    case 1:
+      digitalWrite(A,  LOW);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, LOW);   
+      digitalWrite(E, LOW);   
+      digitalWrite(F,  LOW);   
+      digitalWrite(G, LOW); 
+      break;
+    case 2:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, LOW);   
+      digitalWrite(D, HIGH);   
+      digitalWrite(E, HIGH);   
+      digitalWrite(F,  HIGH);   
+      digitalWrite(G, LOW); 
+      break;
+    case 3:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, HIGH);   
+      digitalWrite(E, LOW);   
+      digitalWrite(F,  HIGH);   
+      digitalWrite(G, LOW); 
+      break;
+    case 4:
+      digitalWrite(A,  LOW);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, LOW);   
+      digitalWrite(E, LOW);   
+      digitalWrite(F,  HIGH);   
+      digitalWrite(G, HIGH); 
+      break;
+    case 5:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, LOW);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, HIGH);   
+      digitalWrite(E, LOW);   
+      digitalWrite(F,  HIGH);   
+      digitalWrite(G, HIGH); 
+      break;
+    case 6:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, LOW);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, HIGH);   
+      digitalWrite(E, HIGH);   
+      digitalWrite(F, HIGH);   
+      digitalWrite(G, HIGH); 
+      break;
+    case 7:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, LOW);   
+      digitalWrite(E, LOW);   
+      digitalWrite(F,  LOW);   
+      digitalWrite(G, LOW); 
+      break;
+    case 8:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, HIGH);   
+      digitalWrite(E, HIGH);   
+      digitalWrite(F,  HIGH);   
+      digitalWrite(G, HIGH); 
+      break;
+    case 9:
+      digitalWrite(A,  HIGH);   
+      digitalWrite(B, HIGH);   
+      digitalWrite(C, HIGH);   
+      digitalWrite(D, LOW);   
+      digitalWrite(E, LOW);   
+      digitalWrite(F,  HIGH);   
+      digitalWrite(G, HIGH); 
+      break;
+    case -1:
+      digitalWrite(A,  LOW);   
+      digitalWrite(B, LOW);   
+      digitalWrite(C, LOW);   
+      digitalWrite(D, LOW);   
+      digitalWrite(E, LOW);   
+      digitalWrite(F,  LOW);   
+      digitalWrite(G, LOW);
+
+  }
+  return;
 }
