@@ -64,24 +64,22 @@ int moving_buffer[BUFFER_SIZE] = {100,100,100,100,100};
 
 // RTC
 RTCZero rtc;
-const byte seconds = 0;
-const byte minutes = 0;
+const byte seconds = 30;
+const byte minutes = 59;
 const byte hours = 1;
 const byte day = 3;
 const byte month = 12;
 const byte year = 23;
-const int ACK_TIMEOUT = 10; // seconds
 byte currentDay;
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
+  // while (!Serial);
 
   // pin modes
   pinMode(LED, OUTPUT);
   pinMode(ECHO, INPUT);
   pinMode(TRIG, OUTPUT);
-  // pinMode(BRIGHTNESS, OUTPUT);
   pinMode(START_BTN, INPUT);
   pinMode(END_BTN, INPUT);
   pinMode(A, OUTPUT);
@@ -128,20 +126,13 @@ void setup() {
   Serial.print("Advertising 'Perk Up Peripheral' with UUID: ");
   Serial.print(sensorService.uuid());
   Serial.println("...");
-
-  // initialize state
-  state = IDLE;
-  Serial.println("IDLE");
-  for(int i = 0; i < 4; i++) {
-    sevenSeg(i, -1);
-  }
 }
 
 void loop() {
   // get button input
   if (!already_reading_1 && digitalRead(START_BTN) == HIGH) {
     already_reading_1 = 1;
-    if (startHours == 24) {
+    if (startHours == 23) {
       startHours = 0;
     } else {
       startHours = startHours + 1;
@@ -151,7 +142,7 @@ void loop() {
   }
   if (!already_reading_2 && digitalRead(END_BTN) == HIGH) {
     already_reading_2 = 1;
-    if (endHours == 24) {
+    if (endHours == 23) {
       endHours = 0;
     } else {
       endHours = endHours + 1;
@@ -161,12 +152,7 @@ void loop() {
   }
 
   count++; // used for 7 segement display
-
   setSevenSeg();
-
-  // Serial.print(startHours);
-  // Serial.print("\t");
-  // Serial.println(endHours);
 
   // listen for Bluetooth® Low Energy peripherals to connect:
   BLEDevice central = BLE.central();
@@ -175,10 +161,37 @@ void loop() {
     Serial.print("Connected to central: ");
     Serial.println(central.address());
     Serial.println("Schedule: " + String(startHours) + " - " + String(endHours));
-    offSevenSeg();
+
+    // clear old values, initialize state to IDLE
+    if (central.connected()) {
+      movementCharacteristic.writeValue(false);
+      offSevenSeg();
+      state = IDLE;
+      Serial.println("IDLE");
+    }
 
     while(central.connected()) {
+      // blink display if schedule is invalid
+      if (endHours < startHours || ((endHours == startHours) && (startHours != 0))) {
+        offSevenSeg();
+        delay(500);
+        setSevenSeg();
+        delay(500);
+        continue;
+      }
+      // Serial.print(rtc.getHours());
+      // Serial.print(":");
+      // Serial.print(rtc.getMinutes());
+      // Serial.print(":");
+      // Serial.println(rtc.getSeconds());
       if (state == SENSE_MOVEMENT) {
+        if (is_in_schedule() == true) {
+          state = SENSE_MOVEMENT;
+        } else {
+          state = IDLE_COFFEE_DONE;
+          Serial.println("SENSE_MOVEMENT -> IDLE_COFFEE_DONE");
+          continue;
+        }
         // clear TRIG pin
         digitalWrite(TRIG, LOW);
         delayMicroseconds(2);
@@ -201,7 +214,6 @@ void loop() {
           movementCharacteristic.writeValue(false);
           state = SENSE_MOVEMENT;
         }
-        // Serial.println(distance);
       } else if (state == AWAIT_ACK) {
         // await ack from central that coffee was dispensed
         byte ack;
@@ -214,6 +226,7 @@ void loop() {
         }
       } else if (state == IDLE_COFFEE_DONE) {
         // coffee dispensed for the day, wait for next day
+        movementCharacteristic.writeValue(false);
         if (currentDay != rtc.getDay()) {
           currentDay = rtc.getDay();
           state = IDLE;
@@ -223,9 +236,10 @@ void loop() {
         }
       } else if (state == IDLE) {
         // wait until current time is within schedule
+        movementCharacteristic.writeValue(false);
         byte currentHour = rtc.getHours();
         byte currentSecond = rtc.getSeconds();
-        if (currentHour >= startHours && currentHour < endHours) {
+        if (is_in_schedule() == true) {
           state = SENSE_MOVEMENT;
           Serial.println("IDLE -> SENSE_MOVEMENT");
         } else {
@@ -237,6 +251,19 @@ void loop() {
     Serial.print("Disconnected from central: ");
     Serial.println(central.address());
     state = IDLE;
+  }
+}
+
+bool is_in_schedule() {
+  byte currentHour = rtc.getHours();
+  byte currentSecond = rtc.getSeconds();
+  if (startHours == 0 && endHours == 0) {
+    // edge case for 0-0, all day
+    return true;
+  } else if (currentHour >= startHours && currentHour < endHours) {
+    return true;
+  } else {
+    return false;
   }
 }
 
@@ -263,11 +290,14 @@ bool check_buffer() {
 void setSevenSeg() {
   if (count % 4 == 0) {
     sevenSeg(1, (startHours/10));
-  } else if (count % 4 == 1) {
-    sevenSeg(2,startHours % 10);
-  } else if (count % 4 == 2) {
-    sevenSeg(3,endHours/10);
-  } else {
+  } 
+  if (count % 4 == 1) {
+    sevenSeg(2, startHours % 10);
+  } 
+  if (count % 4 == 2) {
+    sevenSeg(3, endHours/10);
+  }
+  if (count % 4 == 3) {
     sevenSeg(4, endHours % 10);
   }
 }
